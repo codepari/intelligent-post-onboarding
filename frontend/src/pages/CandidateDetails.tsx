@@ -25,7 +25,7 @@ import {
 import { format } from 'date-fns';
 import { useAppDispatch, useAppSelector } from '../hooks/redux';
 import { fetchCandidateById, fetchRiskAssessment } from '../features/candidates/candidatesSlice';
-import axios from 'axios';
+import api from '../services/api';
 
 export default function CandidateDetails() {
   const { id } = useParams<{ id: string }>();
@@ -46,7 +46,7 @@ export default function CandidateDetails() {
 
     try {
       setSchedulingFollowUps(true);
-      await axios.post(`/api/follow-ups/candidates/${id}/schedule`);
+      await api.post(`/follow-ups/candidates/${id}/schedule`);
       setScheduleSuccess(true);
       setTimeout(() => setScheduleSuccess(false), 5000);
     } catch (error) {

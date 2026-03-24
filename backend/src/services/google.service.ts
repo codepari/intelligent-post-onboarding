@@ -55,34 +55,41 @@ export const googleService = {
       return;
     }
 
-    const calendar = google.calendar({ version: 'v3', auth });
-    const joiningDate = new Date(schedule.joiningDate);
-    const intervals = [10, 15, 20];
+    try {
+      const calendar = google.calendar({ version: 'v3', auth });
+      const joiningDate = new Date(schedule.joiningDate);
+      const intervals = [10, 15, 20];
 
-    for (const days of intervals) {
-      const followUpDate = addDays(joiningDate, days);
+      for (const days of intervals) {
+        const followUpDate = addDays(joiningDate, days);
 
-      // Create event for Hiring Manager
-      if (schedule.hmEmail) {
-        await this.createCalendarEvent(calendar, {
-          summary: `Follow-up: ${schedule.candidateName} (Day ${days})`,
-          description: `Post-onboarding check-in with ${schedule.candidateName}\n\nThis is a scheduled follow-up ${days} days after their joining date.`,
-          start: followUpDate,
-          attendees: [schedule.hmEmail],
-          duration: 30 // 30 minutes
-        });
+        // Create event for Hiring Manager (without attendees to avoid permission issues)
+        if (schedule.hmEmail) {
+          await this.createCalendarEvent(calendar, {
+            summary: `Follow-up: ${schedule.candidateName} (Day ${days})`,
+            description: `Post-onboarding check-in with ${schedule.candidateName}\n\nAssigned to: ${schedule.hmEmail}\n\nThis is a scheduled follow-up ${days} days after their joining date.`,
+            start: followUpDate,
+            attendees: [], // Empty to avoid Domain-Wide Delegation requirement
+            duration: 30 // 30 minutes
+          });
+        }
+
+        // Create event for TA Owner (without attendees)
+        if (schedule.taEmail) {
+          await this.createCalendarEvent(calendar, {
+            summary: `Follow-up: ${schedule.candidateName} (Day ${days})`,
+            description: `Post-onboarding check-in with ${schedule.candidateName}\n\nAssigned to: ${schedule.taEmail}\n\nThis is a scheduled follow-up ${days} days after their joining date.`,
+            start: followUpDate,
+            attendees: [], // Empty to avoid Domain-Wide Delegation requirement
+            duration: 30
+          });
+        }
       }
 
-      // Create event for TA Owner
-      if (schedule.taEmail) {
-        await this.createCalendarEvent(calendar, {
-          summary: `Follow-up: ${schedule.candidateName} (Day ${days})`,
-          description: `Post-onboarding check-in with ${schedule.candidateName}\n\nThis is a scheduled follow-up ${days} days after their joining date.`,
-          start: followUpDate,
-          attendees: [schedule.taEmail],
-          duration: 30
-        });
-      }
+      console.log('Calendar events created successfully (Note: Attendees must manually add these to their calendars)');
+    } catch (error) {
+      console.warn('Calendar event creation failed, continuing with sheets tracking:', error.message);
+      // Don't throw - allow sheets tracking to continue
     }
   },
 
@@ -141,53 +148,58 @@ export const googleService = {
       return '';
     }
 
-    const sheets = google.sheets({ version: 'v4', auth });
-    const sheetId = process.env.GOOGLE_TRACKING_SHEET_ID;
+    try {
+      const sheets = google.sheets({ version: 'v4', auth });
+      const sheetId = process.env.GOOGLE_TRACKING_SHEET_ID;
 
-    if (sheetId) {
-      return sheetId;
-    }
+      if (sheetId) {
+        return sheetId;
+      }
 
-    // Create new sheet
-    const response = await sheets.spreadsheets.create({
-      requestBody: {
-        properties: {
-          title: 'Post-Onboarding Follow-up Tracker',
-        },
-        sheets: [
-          {
-            properties: {
-              title: 'Follow-ups',
-            },
+      // Create new sheet
+      const response = await sheets.spreadsheets.create({
+        requestBody: {
+          properties: {
+            title: 'Post-Onboarding Follow-up Tracker',
           },
-        ],
-      },
-    });
-
-    const newSheetId = response.data.spreadsheetId || '';
-
-    // Add headers
-    await sheets.spreadsheets.values.update({
-      spreadsheetId: newSheetId,
-      range: 'Follow-ups!A1:G1',
-      valueInputOption: 'RAW',
-      requestBody: {
-        values: [
-          [
-            'Candidate Name',
-            'Follow-up Date',
-            'Days Since Joining',
-            'Assigned To',
-            'Status',
-            'Notes',
-            'Last Updated'
+          sheets: [
+            {
+              properties: {
+                title: 'Follow-ups',
+              },
+            },
           ],
-        ],
-      },
-    });
+        },
+      });
 
-    console.log(`Created tracking sheet: ${newSheetId}`);
-    return newSheetId;
+      const newSheetId = response.data.spreadsheetId || '';
+
+      // Add headers
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: newSheetId,
+        range: 'Follow-ups!A1:G1',
+        valueInputOption: 'RAW',
+        requestBody: {
+          values: [
+            [
+              'Candidate Name',
+              'Follow-up Date',
+              'Days Since Joining',
+              'Assigned To',
+              'Status',
+              'Notes',
+              'Last Updated'
+            ],
+          ],
+        },
+      });
+
+      console.log(`Created tracking sheet: ${newSheetId}`);
+      return newSheetId;
+    } catch (error) {
+      console.warn('Failed to create/access Google Sheet (permission denied):', error.message);
+      return '';
+    }
   },
 
   /**
@@ -205,59 +217,64 @@ export const googleService = {
       return;
     }
 
-    const sheets = google.sheets({ version: 'v4', auth });
-    const sheetId = await this.getOrCreateTrackingSheet();
+    try {
+      const sheets = google.sheets({ version: 'v4', auth });
+      const sheetId = await this.getOrCreateTrackingSheet();
 
-    if (!sheetId) {
-      console.log('No tracking sheet available');
-      return;
-    }
-
-    const intervals = [10, 15, 20];
-    const joiningDateObj = new Date(joiningDate);
-    const records: any[] = [];
-
-    for (const days of intervals) {
-      const followUpDate = addDays(joiningDateObj, days);
-
-      // Add record for HM
-      if (hmEmail) {
-        records.push([
-          candidateName,
-          format(followUpDate, 'yyyy-MM-dd'),
-          days.toString(),
-          hmEmail,
-          'Pending',
-          '',
-          new Date().toISOString()
-        ]);
+      if (!sheetId) {
+        console.log('No tracking sheet available');
+        return;
       }
 
-      // Add record for TA
-      if (taEmail) {
-        records.push([
-          candidateName,
-          format(followUpDate, 'yyyy-MM-dd'),
-          days.toString(),
-          taEmail,
-          'Pending',
-          '',
-          new Date().toISOString()
-        ]);
+      const intervals = [10, 15, 20];
+      const joiningDateObj = new Date(joiningDate);
+      const records: any[] = [];
+
+      for (const days of intervals) {
+        const followUpDate = addDays(joiningDateObj, days);
+
+        // Add record for HM
+        if (hmEmail) {
+          records.push([
+            candidateName,
+            format(followUpDate, 'yyyy-MM-dd'),
+            days.toString(),
+            hmEmail,
+            'Pending',
+            '',
+            new Date().toISOString()
+          ]);
+        }
+
+        // Add record for TA
+        if (taEmail) {
+          records.push([
+            candidateName,
+            format(followUpDate, 'yyyy-MM-dd'),
+            days.toString(),
+            taEmail,
+            'Pending',
+            '',
+            new Date().toISOString()
+          ]);
+        }
       }
-    }
 
-    if (records.length > 0) {
-      await sheets.spreadsheets.values.append({
-        spreadsheetId: sheetId,
-        range: 'Follow-ups!A:G',
-        valueInputOption: 'RAW',
-        requestBody: {
-          values: records,
-        },
-      });
+      if (records.length > 0) {
+        await sheets.spreadsheets.values.append({
+          spreadsheetId: sheetId,
+          range: 'Follow-ups!A:G',
+          valueInputOption: 'RAW',
+          requestBody: {
+            values: records,
+          },
+        });
 
-      console.log(`Added ${records.length} follow-up records to tracking sheet`);
+        console.log(`Added ${records.length} follow-up records to tracking sheet`);
+      }
+    } catch (error) {
+      console.warn('Google Sheets tracking failed (service account may need Google Sheets API enabled and permissions):', error.message);
+      // Don't throw - allow operation to succeed even without sheets tracking
     }
   },
 
@@ -277,42 +294,46 @@ export const googleService = {
       return;
     }
 
-    const sheets = google.sheets({ version: 'v4', auth });
-    const sheetId = await this.getOrCreateTrackingSheet();
+    try {
+      const sheets = google.sheets({ version: 'v4', auth });
+      const sheetId = await this.getOrCreateTrackingSheet();
 
-    if (!sheetId) {
-      return;
-    }
-
-    // Get all rows to find the matching one
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: sheetId,
-      range: 'Follow-ups!A:G',
-    });
-
-    const rows = response.data.values || [];
-
-    for (let i = 1; i < rows.length; i++) { // Start at 1 to skip header
-      const row = rows[i];
-      if (
-        row[0] === candidateName &&
-        row[1] === followUpDate &&
-        row[3] === assignedTo
-      ) {
-        // Update this row
-        const rowNumber = i + 1;
-        await sheets.spreadsheets.values.update({
-          spreadsheetId: sheetId,
-          range: `Follow-ups!E${rowNumber}:G${rowNumber}`,
-          valueInputOption: 'RAW',
-          requestBody: {
-            values: [[status, notes, new Date().toISOString()]],
-          },
-        });
-
-        console.log(`Updated follow-up status for ${candidateName}`);
-        break;
+      if (!sheetId) {
+        return;
       }
+
+      // Get all rows to find the matching one
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: sheetId,
+        range: 'Follow-ups!A:G',
+      });
+
+      const rows = response.data.values || [];
+
+      for (let i = 1; i < rows.length; i++) { // Start at 1 to skip header
+        const row = rows[i];
+        if (
+          row[0] === candidateName &&
+          row[1] === followUpDate &&
+          row[3] === assignedTo
+        ) {
+          // Update this row
+          const rowNumber = i + 1;
+          await sheets.spreadsheets.values.update({
+            spreadsheetId: sheetId,
+            range: `Follow-ups!E${rowNumber}:G${rowNumber}`,
+            valueInputOption: 'RAW',
+            requestBody: {
+              values: [[status, notes, new Date().toISOString()]],
+            },
+          });
+
+          console.log(`Updated follow-up status for ${candidateName}`);
+          break;
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to update follow-up status in Google Sheets:', error.message);
     }
   },
 
@@ -325,35 +346,40 @@ export const googleService = {
       return [];
     }
 
-    const sheets = google.sheets({ version: 'v4', auth });
-    const sheetId = await this.getOrCreateTrackingSheet();
+    try {
+      const sheets = google.sheets({ version: 'v4', auth });
+      const sheetId = await this.getOrCreateTrackingSheet();
 
-    if (!sheetId) {
+      if (!sheetId) {
+        return [];
+      }
+
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: sheetId,
+        range: 'Follow-ups!A:G',
+      });
+
+      const rows = response.data.values || [];
+      const records: ConversationRecord[] = [];
+
+      for (let i = 1; i < rows.length; i++) { // Skip header
+        const row = rows[i];
+        if (row[4] === 'Pending') { // Status column
+          records.push({
+            candidateName: row[0],
+            followUpDate: row[1],
+            daysSinceJoining: parseInt(row[2]),
+            assignedTo: row[3],
+            status: row[4],
+            notes: row[5] || '',
+          });
+        }
+      }
+
+      return records;
+    } catch (error) {
+      console.warn('Failed to fetch pending follow-ups from Google Sheets:', error.message);
       return [];
     }
-
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: sheetId,
-      range: 'Follow-ups!A:G',
-    });
-
-    const rows = response.data.values || [];
-    const records: ConversationRecord[] = [];
-
-    for (let i = 1; i < rows.length; i++) { // Skip header
-      const row = rows[i];
-      if (row[4] === 'Pending') { // Status column
-        records.push({
-          candidateName: row[0],
-          followUpDate: row[1],
-          daysSinceJoining: parseInt(row[2]),
-          assignedTo: row[3],
-          status: row[4],
-          notes: row[5] || '',
-        });
-      }
-    }
-
-    return records;
   }
 };

@@ -25,7 +25,7 @@ import {
   Refresh as RefreshIcon,
 } from '@mui/icons-material';
 import { format } from 'date-fns';
-import axios from 'axios';
+import api from '../services/api';
 
 interface FollowUp {
   candidateName: string;
@@ -53,7 +53,7 @@ export default function FollowUps() {
   const fetchFollowUps = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/api/follow-ups/pending');
+      const response = await api.get('/follow-ups/pending');
       setFollowUps(response.data.data);
       setError('');
     } catch (err) {
@@ -66,7 +66,7 @@ export default function FollowUps() {
 
   const fetchSheetUrl = async () => {
     try {
-      const response = await axios.get('/api/follow-ups/tracking-sheet');
+      const response = await api.get('/follow-ups/tracking-sheet');
       if (response.data.data.url) {
         setSheetUrl(response.data.data.url);
       }
@@ -85,7 +85,7 @@ export default function FollowUps() {
     if (!selectedFollowUp) return;
 
     try {
-      await axios.post('/api/follow-ups/complete', {
+      await api.post('/follow-ups/complete', {
         candidateName: selectedFollowUp.candidateName,
         followUpDate: selectedFollowUp.followUpDate,
         assignedTo: selectedFollowUp.assignedTo,
