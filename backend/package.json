@@ -19,6 +19,9 @@
     "hr",
     "recruitment"
   ],
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
+  },
   "author": "",
   "license": "MIT",
   "dependencies": {
