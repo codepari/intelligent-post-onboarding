@@ -70,9 +70,14 @@ cd intelligent-post-onboarding
 # Set up backend
 cd backend
 npm install
+
+# Copy and configure environment variables
 cp .env.example .env
+# Edit .env to ensure DATABASE_URL=file:./dev.db (SQLite)
+
+# Generate Prisma client and set up database
 npx prisma generate
-npx prisma migrate dev
+npx prisma db push
 npx prisma db seed
 
 # Set up frontend
@@ -90,7 +95,9 @@ npm run dev
 
 Access at: http://localhost:3000
 
-**Default login**: admin@example.com / admin123
+**Default login**: admin@company.com / password123
+
+> **Note**: The `.env` file must have `DATABASE_URL=file:./dev.db` for SQLite. All test users use password `password123`.
 
 ## 📚 Documentation
 
