@@ -38,11 +38,14 @@ cd ../backend
 # Copy environment file
 cp .env.example .env
 
+# IMPORTANT: Verify DATABASE_URL in .env is set to:
+# DATABASE_URL=file:./dev.db
+
 # Generate Prisma client
 npx prisma generate
 
-# Create database and run migrations
-npx prisma migrate dev
+# Create database and push schema
+npx prisma db push
 
 # Seed with sample data
 npx prisma db seed
@@ -50,9 +53,10 @@ npx prisma db seed
 
 **What this creates:**
 - ✅ SQLite database file at `backend/dev.db`
-- ✅ 3 sample candidates
-- ✅ 5 onboarding stages
+- ✅ 18 sample candidates with realistic data
+- ✅ 6 onboarding stages
 - ✅ 4 test users (admin, TA, HM, HR)
+- ✅ Sample communications and risk assessments
 
 ## Step 3: Start the Application (1 minute)
 
@@ -88,8 +92,10 @@ You should see:
 Open your browser to: **http://localhost:3000**
 
 **Login with:**
-- Email: `admin@example.com`
-- Password: `admin123`
+- Email: `admin@company.com`
+- Password: `password123`
+
+> **Note**: All test users use password `password123`
 
 ## Step 5: Explore Features (1 minute)
 
@@ -137,28 +143,43 @@ The application is now running. Here's what you can do next:
 
 | Role | Email | Password | Access Level |
 |------|-------|----------|--------------|
-| Admin | admin@example.com | admin123 | Full access |
-| TA Owner | ta@company.com | ta123 | Candidate management |
-| Hiring Manager | hm@company.com | hm123 | View assigned candidates |
-| HR Owner | hr@company.com | hr123 | Document access |
+| Admin | admin@company.com | password123 | Full access |
+| TA Owner | ta@company.com | password123 | Candidate management |
+| Hiring Manager | hm@company.com | password123 | View assigned candidates |
+| HR Owner | hr@company.com | password123 | Document access |
+
+> **All users use the same password**: `password123`
 
 ## Sample Data
 
 The system includes:
 
-**3 Candidates:**
-- John Doe (Joining: April 23, 2026)
-- Jane Smith (Joining: May 8, 2026)
-- Alex Brown (Joining: May 23, 2026)
+**18 Candidates:**
+- Variety of job titles (Software Engineer, Product Manager, Data Scientist, etc.)
+- Different joining dates (past, present, and future)
+- Various risk levels (LOW, MEDIUM, HIGH)
+- Realistic communication history
 
-**5 Stages:**
-1. Offer Accepted
-2. Document Collection
-3. Background Verification
-4. Pre-boarding
-5. Day 1 Onboarding
+**6 Stages:**
+1. Offer Release
+2. Offer Acceptance
+3. Pre-Joining Engagement
+4. Documentation & BGV
+5. Joining Readiness
+6. Day 1 Handoff
 
 ## Common Issues
+
+### Prisma Error: "URL must start with the protocol `file:`"
+
+```bash
+# Check your backend/.env file
+# It MUST have:
+DATABASE_URL=file:./dev.db
+
+# NOT:
+# DATABASE_URL=postgresql://...
+```
 
 ### Port already in use
 
@@ -174,12 +195,12 @@ npm run dev -- --port 3001
 
 ```bash
 cd backend
-rm -f dev.db  # Remove old database
-npx prisma migrate dev  # Recreate
-npx prisma db seed  # Reseed
+rm -f dev.db dev.db-journal  # Remove old database
+npx prisma db push           # Recreate
+npx prisma db seed           # Reseed
 ```
 
-### Google Sheets error
+### Google Sheets/Calendar error
 
 This is normal! Google integration is optional. To enable:
 - Follow [GOOGLE_INTEGRATION_SETUP.md](GOOGLE_INTEGRATION_SETUP.md)
