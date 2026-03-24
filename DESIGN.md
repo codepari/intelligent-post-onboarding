@@ -3,24 +3,23 @@
 ## 1. System Overview
 
 ### 1.1 Architecture Overview
-The system follows a modern, cloud-native, microservices-inspired architecture with:
+The system follows a modern, lightweight architecture with:
 - **Frontend**: React SPA with Material-UI
-- **Backend**: Node.js/Express REST API with AI/ML capabilities
-- **Database**: PostgreSQL for relational data, Redis for caching
-- **AI/ML Layer**: Python-based ML service for intelligent features
-- **Message Queue**: AWS SQS for async processing
-- **Email Service**: AWS SES for email delivery
-- **Storage**: AWS S3 for document storage
-- **Monitoring**: CloudWatch, Prometheus
+- **Backend**: Node.js/Express REST API with rule-based AI capabilities
+- **Database**: SQLite for local development (PostgreSQL for production)
+- **Integrations**: Google Calendar API, Google Sheets API
+- **Email Service**: Nodemailer (SMTP-based)
+- **Storage**: Local filesystem (S3 for production)
+- **Monitoring**: Winston logging
 
 ### 1.2 Intelligent Features
-The system incorporates AI/ML capabilities:
-- **Predictive Renege Detection**: ML model to predict candidate drop-off risk
-- **Sentiment Analysis**: NLP analysis of candidate communications
-- **Smart Scheduling**: AI-powered optimal communication timing
-- **Automated Follow-ups**: Context-aware automated reminders
-- **Anomaly Detection**: Identify unusual patterns in candidate behavior
-- **Recommendation Engine**: Suggest best engagement strategies
+The system incorporates rule-based AI capabilities:
+- **Predictive Renege Detection**: Rule-based scoring model to predict candidate drop-off risk
+- **Sentiment Analysis**: Basic sentiment scoring of candidate communications
+- **Automated Follow-ups**: Scheduled follow-ups at 10, 15, 20 days post-joining
+- **Risk Scoring**: Multi-factor risk assessment based on communication patterns
+- **Google Calendar Integration**: Automated calendar event creation for follow-ups
+- **Google Sheets Tracking**: Centralized tracking of all follow-up conversations
 
 ## 2. Technology Stack
 
@@ -42,40 +41,40 @@ The system incorporates AI/ML capabilities:
 - **ORM**: Prisma
 - **Authentication**: JWT (jsonwebtoken)
 - **Validation**: Zod
-- **Email**: Nodemailer + AWS SES
+- **Email**: Nodemailer (SMTP)
 - **Scheduling**: node-cron
-- **File Upload**: Multer + AWS S3
+- **File Upload**: Multer (local filesystem)
+- **Google APIs**: googleapis (Calendar & Sheets)
 - **Logging**: Winston + Morgan
 - **Testing**: Jest + Supertest
 
-### 2.3 AI/ML Service
-- **Language**: Python 3.11+
-- **Framework**: FastAPI
-- **ML Libraries**:
-  - scikit-learn (classification models)
-  - TensorFlow/Keras (deep learning)
-  - spaCy / Transformers (NLP)
-  - pandas, numpy (data processing)
-- **Model Serving**: TensorFlow Serving / MLflow
+### 2.3 Rule-Based AI System
+- **Language**: TypeScript (integrated in backend)
+- **Approach**: Rule-based scoring algorithms
+- **Risk Factors**:
+  - Days since last contact
+  - Response delay patterns
+  - Stage transition delays
+  - Communication frequency
+  - Joining date proximity
+- **Sentiment Analysis**: Keyword-based scoring
+- **Fallback Strategy**: Graceful degradation with default risk levels
 
-### 2.4 Database & Caching
-- **Primary DB**: PostgreSQL 15+
-- **Caching**: Redis 7+
-- **Search**: PostgreSQL Full-Text Search (or ElasticSearch for advanced)
+### 2.4 Database & Storage
+- **Primary DB**: SQLite (local dev), PostgreSQL (production)
+- **File Storage**: Local filesystem (development), S3 (production)
+- **Session Storage**: In-memory (development), Redis (production optional)
+- **Google Integration**: Google Sheets for follow-up tracking
 
-### 2.5 Infrastructure (AWS)
-- **Compute**: ECS Fargate / EC2
-- **Load Balancer**: Application Load Balancer
-- **Database**: RDS PostgreSQL
-- **Cache**: ElastiCache Redis
-- **Storage**: S3
-- **Queue**: SQS
-- **Email**: SES
-- **Monitoring**: CloudWatch, X-Ray
-- **CDN**: CloudFront
-- **DNS**: Route 53
-- **Secrets**: Secrets Manager
-- **CI/CD**: CodePipeline / GitHub Actions
+### 2.5 External Integrations
+- **Google Calendar API**: Automated follow-up event scheduling
+- **Google Sheets API**: Centralized follow-up tracking and status updates
+- **Email**: SMTP-based email delivery (Gmail, SendGrid, or custom SMTP)
+- **Optional Production Services**:
+  - AWS S3 for document storage
+  - AWS SES for email delivery
+  - Redis for caching
+  - CloudWatch for monitoring
 
 ## 3. System Architecture
 
@@ -93,38 +92,24 @@ The system incorporates AI/ML capabilities:
                             │ HTTPS
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                      API Gateway / ALB                       │
+│                    Backend API Service                       │
+│                   (Node.js/Express/TypeScript)               │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │ • Auth Service        • Analytics Service           │    │
+│  │ • Candidate Service   • Notification Service        │    │
+│  │ • Communication Svc   • Google Calendar Service     │    │
+│  │ • Document Service    • Google Sheets Service       │    │
+│  │ • Rule-Based AI       • Follow-up Scheduler         │    │
+│  └─────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────┘
-                            │
-                ┌───────────┴───────────┐
-                ▼                       ▼
-┌───────────────────────────┐  ┌──────────────────────┐
-│    Backend API Service    │  │   ML/AI Service      │
-│    (Node.js/Express)      │  │   (Python/FastAPI)   │
-│  ┌─────────────────────┐  │  │  ┌────────────────┐  │
-│  │ Auth Service        │  │  │  │ Renege Predict │  │
-│  │ Candidate Service   │  │  │  │ Sentiment AI   │  │
-│  │ Communication Svc   │  │  │  │ Smart Schedule │  │
-│  │ Document Service    │  │  │  │ Anomaly Detect │  │
-│  │ Analytics Service   │  │  │  └────────────────┘  │
-│  │ Notification Svc    │  │  └──────────────────────┘
-│  └─────────────────────┘  │
-└───────────────────────────┘
-         │        │
-         │        └──────────────┐
-         ▼                       ▼
-┌──────────────────┐    ┌──────────────────┐
-│   PostgreSQL     │    │      Redis       │
-│   (RDS)          │    │  (ElastiCache)   │
-└──────────────────┘    └──────────────────┘
-         │
-         ▼
-┌──────────────────────────────────────────┐
-│           AWS Services                    │
-│  ┌──────┐  ┌──────┐  ┌──────┐           │
-│  │  S3  │  │ SES  │  │ SQS  │           │
-│  └──────┘  └──────┘  └──────┘           │
-└──────────────────────────────────────────┘
+         │              │                    │
+         │              │                    │
+         ▼              ▼                    ▼
+┌──────────────┐  ┌──────────────┐  ┌──────────────────┐
+│   SQLite/    │  │   Local FS/  │  │  Google APIs     │
+│  PostgreSQL  │  │   AWS S3     │  │  • Calendar      │
+│  (Database)  │  │  (Storage)   │  │  • Sheets        │
+└──────────────┘  └──────────────┘  └──────────────────┘
 ```
 
 ### 3.2 Component Architecture
@@ -505,13 +490,13 @@ GET    /api/analytics/stage-distribution       # Candidates by stage
 GET    /api/analytics/time-to-join             # Time to join metrics
 ```
 
-#### AI/ML Endpoints (ML Service)
+#### AI/ML Endpoints (Integrated in Backend)
 ```
-POST   /api/ml/predict-renege                  # Predict renege risk
-POST   /api/ml/analyze-sentiment               # Analyze sentiment
-POST   /api/ml/recommend-action                # Get recommended actions
-POST   /api/ml/detect-anomaly                  # Detect anomalies
-POST   /api/ml/optimal-timing                  # Suggest optimal contact time
+GET    /api/candidates/:id/risk                # Get rule-based risk assessment
+POST   /api/follow-ups/candidates/:id/schedule # Schedule automated follow-ups
+GET    /api/follow-ups/pending                 # Get pending follow-ups from Google Sheets
+POST   /api/follow-ups/complete                # Mark follow-up as complete
+GET    /api/follow-ups/tracking-sheet          # Get Google Sheet URL
 ```
 
 #### Notifications
@@ -613,64 +598,72 @@ GET    /api/users/:id/candidates               # Get user's candidates
 }
 ```
 
-## 6. AI/ML Features Design
+## 6. Rule-Based AI Features Design
 
 ### 6.1 Renege Prediction Model
 
-**Algorithm**: Random Forest / Gradient Boosting
-**Features**:
-- Days to joining
-- Response time to communications (avg, max)
-- Number of communications sent vs responded
-- Sentiment scores (avg, trend)
-- Stage transition delays
-- Joining date changes count
-- Last contact days ago
-- Document submission delays
-- Region
-- Role level
+**Algorithm**: Rule-based scoring system
+**Features Evaluated**:
+- Days to joining (weight: 0.25)
+- Response time to communications (weight: 0.20)
+- Number of communications vs responses (weight: 0.15)
+- Stage transition delays (weight: 0.15)
+- Joining date changes count (weight: 0.15)
+- Last contact days ago (weight: 0.10)
 
-**Output**: Probability score (0-1) → Risk level (LOW/MEDIUM/HIGH)
+**Scoring Logic**:
+```typescript
+riskScore = (
+  dayToJoiningScore * 0.25 +
+  responseTimeScore * 0.20 +
+  communicationRatioScore * 0.15 +
+  stageDelayScore * 0.15 +
+  joiningChangesScore * 0.15 +
+  lastContactScore * 0.10
+) * 100
 
-**Training**: Historical candidate data with outcomes (joined/reneged)
+riskLevel = riskScore >= 70 ? 'HIGH' :
+            riskScore >= 40 ? 'MEDIUM' : 'LOW'
+```
+
+**Output**: Risk score (0-100), Risk level (LOW/MEDIUM/HIGH), Contributing factors
+
+**Fallback**: If insufficient data, defaults to LOW risk with lower confidence
 
 ### 6.2 Sentiment Analysis
 
-**Approach**: Fine-tuned BERT or use pre-trained sentiment model
-**Input**: Email responses, call notes
+**Approach**: Keyword-based sentiment scoring
+**Input**: Email responses, call notes, communication content
+**Logic**:
+- Positive keywords: "excited", "looking forward", "great", "thanks" (+1)
+- Negative keywords: "concerned", "worried", "issue", "problem" (-1)
+- Neutral: everything else (0)
+
 **Output**: Sentiment score (-1 to 1), label (POSITIVE/NEUTRAL/NEGATIVE)
 
 **Use Cases**:
-- Track candidate engagement over time
+- Track candidate engagement trends
 - Flag negative sentiment for intervention
 - Measure communication effectiveness
 
-### 6.3 Smart Scheduling
+### 6.3 Automated Follow-ups
 
-**Algorithm**: Reinforcement Learning or Rule-based
-**Factors**:
-- Candidate's response patterns (time of day, day of week)
-- Historical engagement rates
-- Timezone
-- Stage urgency
+**Schedule**: 10, 15, 20 days after joining date
+**Integration**:
+- Google Calendar: Creates events for HM and TA
+- Google Sheets: Tracks all scheduled follow-ups
+**Status Tracking**: Pending → Completed with notes
 
-**Output**: Optimal time to send next communication
+### 6.4 Risk Factors Identification
 
-### 6.4 Anomaly Detection
+**Factors Monitored**:
+- Delayed responses (>3 days)
+- Joining date changes (multiple postponements)
+- Negative sentiment in communications
+- Document submission delays
+- Stage duration exceeding typical timeframe
 
-**Algorithm**: Isolation Forest / Autoencoders
-**Monitor**:
-- Unusual response patterns
-- Sudden sentiment drops
-- Stage duration outliers
-- Communication frequency anomalies
-
-**Output**: Anomaly flag + severity
-
-### 6.5 Recommendation Engine
-
-**Input**: Candidate profile, current state, historical patterns
-**Output**: Suggested actions (e.g., "Schedule HM call", "Send culture video", "Check compensation concerns")
+**Output**: List of risk factors with impact level (HIGH/MEDIUM/LOW)
 
 ## 7. Security Architecture
 
@@ -699,9 +692,22 @@ GET    /api/users/:id/candidates               # Get user's candidates
 - **Data retention policies**: Automated cleanup
 - **Access logs**: CloudWatch
 
-## 8. Deployment Architecture (AWS)
+## 8. Deployment Architecture
 
-### 8.1 Production Environment
+### 8.1 Local Development Environment
+
+```
+localhost:3000 (Frontend - React/Vite)
+    ↓
+localhost:5001 (Backend API - Node.js/Express)
+    ↓
+    ├─→ SQLite Database (./dev.db)
+    ├─→ Local Filesystem (./uploads)
+    ├─→ Google Calendar API
+    └─→ Google Sheets API
+```
+
+### 8.2 Production Environment (Optional AWS Deployment)
 
 ```
 Route 53 (DNS)
@@ -710,70 +716,69 @@ CloudFront (CDN) → S3 (Static Frontend)
     ↓
 Application Load Balancer
     ↓
-    ├─→ ECS Fargate (Backend API) [Auto-scaling 2-10 instances]
-    └─→ ECS Fargate (ML Service) [Auto-scaling 1-5 instances]
-         ↓
-         ├─→ RDS PostgreSQL (Multi-AZ)
-         ├─→ ElastiCache Redis (Cluster mode)
-         ├─→ S3 (Document storage)
-         ├─→ SES (Email service)
-         └─→ SQS (Message queue)
+ECS Fargate / EC2 (Backend API)
+    ↓
+    ├─→ RDS PostgreSQL
+    ├─→ S3 (Document storage)
+    ├─→ SES (Email service)
+    ├─→ Google Calendar API
+    └─→ Google Sheets API
 ```
 
-### 8.2 Environment Configuration
-- **Development**: Single instance, t3.small
-- **Staging**: 2 instances, t3.medium
-- **Production**: Auto-scaling 2-10 instances, t3.large
+### 8.3 Environment Configuration
+- **Development**:
+  - Single process
+  - SQLite database
+  - Local file storage
+  - SMTP email (optional)
 
-### 8.3 CI/CD Pipeline
-1. Code push to GitHub
-2. GitHub Actions triggers build
-3. Run tests (unit, integration)
-4. Build Docker images
-5. Push to ECR
-6. Deploy to ECS via CodeDeploy (Blue/Green)
-7. Run smoke tests
-8. Complete deployment
+- **Production** (if deployed):
+  - Auto-scaling instances
+  - PostgreSQL database
+  - S3 storage
+  - AWS SES email
+  - CloudWatch monitoring
 
 ## 9. Performance Optimization
 
-### 9.1 Caching Strategy
-- **Redis caching**:
-  - User sessions (TTL: 24h)
-  - Candidate lists (TTL: 5min)
-  - Dashboard metrics (TTL: 15min)
-  - Templates (TTL: 1h)
+### 9.1 Backend Optimization
+- **Database**:
+  - Indexed frequently queried fields
+  - Connection pooling via Prisma
+  - Efficient queries with Prisma query builder
+  - Pagination for large datasets (50 items/page)
 
-### 9.2 Database Optimization
-- **Indexes** on frequently queried fields
-- **Connection pooling**: Max 20 connections
-- **Query optimization**: Use Prisma's query builder
-- **Pagination**: Limit 50 items per page
+### 9.2 API Optimization
+- **Response compression**: gzip enabled
+- **Efficient data fetching**: Only load required fields
+- **Lazy loading**: Pagination on candidate lists
+- **Error handling**: Graceful degradation for external services
 
-### 9.3 API Optimization
-- **Response compression**: gzip
-- **Lazy loading**: Pagination on large datasets
-- **GraphQL** (future): For flexible data fetching
+### 9.3 Frontend Optimization
+- **Code splitting**: React lazy loading
+- **Memoization**: React.memo for expensive components
+- **Virtual scrolling**: For long lists
+- **Debouncing**: Search inputs
 
 ## 10. Monitoring & Observability
 
 ### 10.1 Metrics to Track
-- **API**: Response time, error rate, throughput
+- **API**: Response time, error rate, request count
 - **Database**: Query time, connection count
-- **ML**: Model latency, prediction accuracy
-- **Business**: Candidate counts, conversion rates
+- **Google APIs**: API call success/failure rates
+- **Business**: Candidate counts, risk distribution, follow-up completion rates
 
 ### 10.2 Logging
 - **Application logs**: Winston (JSON format)
-- **Access logs**: Morgan
-- **Centralized logging**: CloudWatch Logs
+- **Access logs**: Morgan (HTTP requests)
+- **Console output**: Development environment
+- **File logging**: Production environment
 
-### 10.3 Alerting
-- **High error rate** (>5% in 5min)
-- **Slow response time** (>2s avg)
-- **Database connection issues**
-- **Email delivery failures**
-- **High-risk candidates detected**
+### 10.3 Error Handling
+- **Graceful degradation**: Google API failures don't break app
+- **User-friendly messages**: Clear error communication
+- **Retry logic**: For transient failures
+- **Fallback mechanisms**: Rule-based AI when ML unavailable
 
 ## 11. Testing Strategy
 
@@ -788,10 +793,10 @@ Application Load Balancer
 - **Component tests**: Storybook
 - **E2E tests**: Cypress (critical user flows)
 
-### 11.3 ML Testing
-- **Model validation**: Cross-validation, train/test split
-- **A/B testing**: Compare model versions
-- **Monitoring**: Track prediction accuracy over time
+### 11.3 System Testing
+- **Integration tests**: Google API integration
+- **E2E flows**: Complete candidate journey
+- **Performance**: Load testing with realistic data
 
 ## 12. Migration & Rollout Plan
 
@@ -807,11 +812,12 @@ Application Load Balancer
 - BGV tracking
 - Dashboard & analytics
 
-### Phase 3 (Month 3): AI Features
-- Renege prediction model
+### Phase 3 (Month 3): AI & Automation Features
+- Rule-based renege prediction
 - Sentiment analysis
-- Smart notifications
-- Anomaly detection
+- Automated follow-up scheduling (10, 15, 20 days)
+- Google Calendar integration
+- Google Sheets tracking
 
 ### Phase 4 (Ongoing): Enhancements
 - Mobile app
@@ -822,14 +828,14 @@ Application Load Balancer
 ## 13. Risk Mitigation
 
 ### 13.1 Technical Risks
-- **Risk**: ML model accuracy issues
-  - **Mitigation**: Start with rule-based fallback, gradual rollout
+- **Risk**: Google API rate limits or permission issues
+  - **Mitigation**: Error handling, graceful degradation, retry logic
 
 - **Risk**: Email deliverability problems
-  - **Mitigation**: Use reputable service (SES), monitor bounce rates
+  - **Mitigation**: Use reputable SMTP service, monitor bounce rates
 
-- **Risk**: Performance degradation at scale
-  - **Mitigation**: Load testing, auto-scaling, caching
+- **Risk**: SQLite limitations at scale
+  - **Mitigation**: Easy migration path to PostgreSQL for production
 
 ### 13.2 Business Risks
 - **Risk**: Low user adoption
@@ -840,21 +846,22 @@ Application Load Balancer
 
 ## 14. Future Enhancements
 
-### 14.1 Advanced AI
+### 14.1 Machine Learning Enhancements
+- **ML-based prediction**: Upgrade to scikit-learn/TensorFlow models
+- **Deep learning NLP**: Advanced sentiment analysis with transformers
 - **Conversational AI**: Chatbot for candidate queries
-- **Voice analysis**: Analyze candidate call recordings
-- **Predictive analytics**: Forecast hiring pipeline
+- **Predictive analytics**: Forecast hiring pipeline trends
 
 ### 14.2 Integration
 - **ATS systems**: Greenhouse, Lever, Workday
 - **HRMS**: BambooHR, Workday
 - **Communication**: Slack, Microsoft Teams
 
-### 14.3 Advanced Features
-- **Mobile app**: Native iOS/Android apps
-- **Workflow automation**: No-code workflow builder
-- **Custom reports**: Drag-and-drop report builder
-- **Multi-language**: Support 10+ languages
+### 14.3 Infrastructure Enhancements
+- **Message Queue**: Add SQS/RabbitMQ for async processing
+- **Caching Layer**: Redis for performance optimization
+- **CDN**: CloudFront for global distribution
+- **Monitoring**: CloudWatch, Prometheus, Grafana dashboards
 
 ## 15. Appendix
 
@@ -870,20 +877,18 @@ Application Load Balancer
 - Excellent async I/O for API services
 - Rich npm ecosystem
 
-**Why PostgreSQL?**
-- ACID compliance for critical data
-- Excellent JSON support (for metadata)
-- Mature and reliable
+**Why SQLite?**
+- Zero configuration for development
+- File-based, no server needed
+- Easy migration to PostgreSQL for production
+- Sufficient for MVP and small deployments
 
-**Why AWS?**
-- Comprehensive service offerings
-- Excellent documentation
-- Industry-standard for enterprise
-
-**Why AI/ML?**
-- Competitive advantage through intelligence
-- Proactive vs reactive candidate management
-- Data-driven decision making
+**Why Rule-Based AI?**
+- Immediate value without ML infrastructure
+- Transparent and explainable decisions
+- No training data required initially
+- Easy to tune and adjust
+- Clear upgrade path to ML models
 
 ### 15.2 References
 - AWS Well-Architected Framework
