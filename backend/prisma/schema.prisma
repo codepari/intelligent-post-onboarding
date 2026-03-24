@@ -1,0 +1,223 @@
+// Prisma schema for Post-Onboarding Management System (SQLite)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String   @id @default(uuid())
+  email            String   @unique
+  passwordHash     String
+  firstName        String
+  lastName         String
+  role             String   // TA, HM, HR_OPS, HRBP, ADMIN
+  region           String?
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relations
+  candidatesAsTA   Candidate[] @relation("TAOwner")
+  candidatesAsHM   Candidate[] @relation("HMOwner")
+  candidatesAsHR   Candidate[] @relation("HROwner")
+  communications   Communication[]
+  escalationsCreated Escalation[] @relation("EscalatedBy")
+  escalationsAssigned Escalation[] @relation("AssignedTo")
+  templates        Template[]
+
+  @@map("users")
+}
+
+model Stage {
+  id                  String   @id @default(uuid())
+  name                String
+  orderIndex          Int      @unique
+  description         String?
+  typicalDurationDays Int?
+  createdAt           DateTime @default(now())
+
+  // Relations
+  candidates Candidate[]
+
+  @@map("stages")
+}
+
+model Candidate {
+  id                  String           @id @default(uuid())
+  firstName           String
+  lastName            String
+  email               String
+  phone               String?
+  jobTitle            String
+  compensation        Float?           // Changed from Decimal
+  currency            String           @default("USD")
+  joiningDate         String           // Changed from DateTime Date
+  offerDate           String           // Changed from DateTime Date
+  acceptanceDate      String?          // Changed from DateTime Date
+  acceptanceDeadline  String?          // Changed from DateTime Date
+  location            String?
+  region              String           // INDIA, US, UK_EU
+  workArrangement     String?          // WFO, REMOTE, HYBRID
+  currentStageId      String?
+  currentStage        Stage?           @relation(fields: [currentStageId], references: [id])
+  taOwnerId           String?
+  taOwner             User?            @relation("TAOwner", fields: [taOwnerId], references: [id])
+  hmOwnerId           String?
+  hmOwner             User?            @relation("HMOwner", fields: [hmOwnerId], references: [id])
+  hrOwnerId           String?
+  hrOwner             User?            @relation("HROwner", fields: [hrOwnerId], references: [id])
+  offerStatus         String           @default("PENDING") // PENDING, ACCEPTED, REJECTED, EXPIRED
+  riskScore           Float            @default(0)         // Changed from Decimal
+  riskLevel           String           @default("LOW")     // LOW, MEDIUM, HIGH, CRITICAL
+  lastContactDate     DateTime?
+  notes               String?
+  isActive            Boolean          @default(true)
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  // Relations
+  communications Communication[]
+  documents      Document[]
+  bgvRecords     BGVRecord[]
+  escalations    Escalation[]
+  aiInsights     AIInsight[]
+
+  @@index([currentStageId])
+  @@index([joiningDate])
+  @@index([taOwnerId])
+  @@map("candidates")
+}
+
+model Communication {
+  id                   String               @id @default(uuid())
+  candidateId          String
+  candidate            Candidate            @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  type                 String               // EMAIL, CALL, MEETING, SMS, WHATSAPP
+  category             String?
+  subject              String?
+  content              String?
+  sentAt               DateTime?
+  sentById             String?
+  sentBy               User?                @relation(fields: [sentById], references: [id])
+  status               String               // SCHEDULED, SENT, DELIVERED, FAILED, RESPONDED
+  responseReceivedAt   DateTime?
+  responseContent      String?
+  sentimentScore       Float?               // Changed from Decimal
+  sentimentLabel       String?              // POSITIVE, NEUTRAL, NEGATIVE
+  createdAt            DateTime             @default(now())
+
+  @@index([candidateId])
+  @@index([sentAt])
+  @@map("communications")
+}
+
+model Document {
+  id           String         @id @default(uuid())
+  candidateId  String
+  candidate    Candidate      @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  type         String
+  fileName     String
+  filePath     String
+  fileSize     Int?
+  mimeType     String?
+  status       String         @default("PENDING") // PENDING, SUBMITTED, VERIFIED, REJECTED
+  uploadedAt   DateTime?
+  verifiedAt   DateTime?
+  verifiedById String?
+  notes        String?
+  createdAt    DateTime       @default(now())
+
+  @@index([candidateId])
+  @@map("documents")
+}
+
+model BGVRecord {
+  id                     String     @id @default(uuid())
+  candidateId            String
+  candidate              Candidate  @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  status                 String     @default("NOT_STARTED") // NOT_STARTED, INITIATED, IN_PROGRESS, COMPLETED, ISSUES
+  vendor                 String?
+  initiatedDate          String?    // Changed from DateTime Date
+  expectedCompletionDate String?    // Changed from DateTime Date
+  actualCompletionDate   String?    // Changed from DateTime Date
+  result                 String?    // CLEAR, DISCREPANCY, FAILED
+  notes                  String?
+  createdAt              DateTime   @default(now())
+  updatedAt              DateTime   @updatedAt
+
+  @@index([candidateId])
+  @@map("bgv_records")
+}
+
+model Escalation {
+  id            String              @id @default(uuid())
+  candidateId   String
+  candidate     Candidate           @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  reason        String
+  description   String?
+  severity      String              // LOW, MEDIUM, HIGH, CRITICAL
+  escalatedById String
+  escalatedBy   User                @relation("EscalatedBy", fields: [escalatedById], references: [id])
+  assignedToId  String?
+  assignedTo    User?               @relation("AssignedTo", fields: [assignedToId], references: [id])
+  status        String              @default("OPEN") // OPEN, IN_PROGRESS, RESOLVED, CLOSED
+  resolution    String?
+  escalatedAt   DateTime            @default(now())
+  resolvedAt    DateTime?
+  createdAt     DateTime            @default(now())
+
+  @@index([status])
+  @@map("escalations")
+}
+
+model Template {
+  id          String   @id @default(uuid())
+  name        String
+  type        String
+  category    String?
+  subject     String?
+  body        String
+  region      String?
+  variables   String?  // JSON string
+  isActive    Boolean  @default(true)
+  createdById String?
+  createdBy   User?    @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("templates")
+}
+
+model AIInsight {
+  id            String      @id @default(uuid())
+  candidateId   String
+  candidate     Candidate   @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  insightType   String      // RENEGE_RISK, SENTIMENT, ENGAGEMENT, ANOMALY, RECOMMENDATION
+  score         Float?      // Changed from Decimal
+  confidence    Float?      // Changed from Decimal
+  details       String?     // JSON string
+  recommendations String?
+  generatedAt   DateTime    @default(now())
+  modelVersion  String?
+
+  @@index([candidateId, insightType])
+  @@map("ai_insights")
+}
+
+model Metric {
+  id         String   @id @default(uuid())
+  metricType String
+  metricName String
+  value      Float    // Changed from Decimal
+  date       String   // Changed from DateTime Date
+  region     String?
+  metadata   String?  // JSON string
+  createdAt  DateTime @default(now())
+
+  @@map("metrics")
+}
